@@ -1,10 +1,11 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import {getQueueStatusLabel} from './getQueueStatusLabel';
+import {getQueueStatusLabel} from '../getQueueStatusLabel';
+import {StreamContentRenderer, streamBubbleClassName} from './streamRenderers';
+import type {StreamPresentation} from './useStreamPresentation';
 
 interface StreamingDisplayProps {
   isGenerating: boolean;
-  displayedText: string;
+  receivedText: string;
+  presentation: StreamPresentation;
   isReasoning: boolean;
   hasStarted: boolean;
   queuePosition: number | null;
@@ -25,7 +26,8 @@ function AnimatedStatus({label}: {label: string}) {
 
 export const StreamingDisplay = ({
   isGenerating,
-  displayedText,
+  receivedText,
+  presentation,
   isReasoning,
   hasStarted,
   queuePosition,
@@ -48,7 +50,7 @@ export const StreamingDisplay = ({
     );
   }
 
-  if (isReasoning && !displayedText) {
+  if (isReasoning && !receivedText) {
     return (
       <div className='flex min-w-0 justify-start'>
         <AnimatedStatus label='Reasoning' />
@@ -56,28 +58,12 @@ export const StreamingDisplay = ({
     );
   }
 
-  if (!displayedText) return null;
+  if (!presentation.hasVisibleContent) return null;
 
   return (
     <div className='flex min-w-0 justify-start'>
-      <div className='chat-prose max-w-full min-w-0 font-medium rounded-2xl rounded-bl-md px-1.5 py-2.5 text-[14px] text-slate-900 prose prose-slate prose-sm prose-p:my-1 prose-headings:my-2 prose-pre:bg-slate-900 prose-pre:text-slate-100'>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            a: ({href, children}) => (
-              <a
-                href={href}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='text-slate-900 underline underline-offset-2 hover:text-slate-700'
-              >
-                {children}
-              </a>
-            ),
-          }}
-        >
-          {displayedText}
-        </ReactMarkdown>
+      <div className={streamBubbleClassName}>
+        <StreamContentRenderer presentation={presentation} />
       </div>
     </div>
   );

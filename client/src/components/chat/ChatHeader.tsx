@@ -15,7 +15,7 @@ export const ChatHeader = ({
   onClose,
 }: ChatHeaderProps) => {
   return (
-    <header className='grid grid-cols-[2.5rem_1fr_2.5rem] items-center h-12 border-b border-slate-200 bg-white px-2'>
+    <header className='grid shrink-0 grid-cols-[2.5rem_1fr_2.5rem] items-center h-12 border-b border-slate-200 bg-white px-2'>
       <div>
         {hasMessages && (
           <button

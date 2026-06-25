@@ -21,7 +21,7 @@ export const InputSection = ({
   const isDisabled = loading || isGenerating || message.trim() === '';
 
   return (
-    <div className='bg-white px-3 pb-3.5 pt-0'>
+    <div className='shrink-0 bg-white px-3 pb-3.5 pt-0'>
       <label htmlFor='chat-input' className='sr-only'>
         Type your question here
       </label>

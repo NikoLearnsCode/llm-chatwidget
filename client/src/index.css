@@ -32,67 +32,12 @@ button {
   }
 }
 
-dialog.chat-widget {
-  background: transparent;
-  padding: 0;
-  border: 0;
-  color: inherit;
-  max-width: 100vw;
-  max-height: 100dvh;
-  opacity: 1;
-  transform: none;
-  transition: none;
-}
-
-dialog.chat-widget[open] {
-  opacity: 1;
-  transform: none;
-  transition: none;
-}
-
-@media (max-width: 1023px) {
-  dialog.chat-widget {
-    position: fixed;
-    inset: 0;
-    margin: 0;
-    width: 100%;
-    max-width: none;
-    height: 100dvh;
-    max-height: 100dvh;
-    background: white;
-    overflow: hidden;
-    overscroll-behavior: none;
-    touch-action: none;
-  }
-
-  dialog.chat-widget .chat-messages {
-    touch-action: pan-y;
-  }
-}
-
-dialog.chat-widget::backdrop {
-  background: transparent;
-}
-
-@media (min-width: 1024px) {
-  dialog.chat-widget {
-    position: fixed;
-    inset: auto 1.5rem 2rem auto;
-    margin: 0;
-  }
-}
-
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-}
-
-.chat-messages {
-  scrollbar-gutter: stable both-edges;
-  overscroll-behavior: contain;
 }
 
 .chat-prose {
@@ -127,5 +72,87 @@ dialog.chat-widget::backdrop {
   66%,
   100% {
     content: '...';
+  }
+}
+
+.stream-word,
+.stream-phrase {
+  display: inline;
+}
+
+.stream-fade {
+  animation-name: stream-fade;
+  /* animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); */
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes stream-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.stream-word-in {
+  animation-name: stream-word-in;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes stream-word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.stream-caret {
+  & > :last-child:not(ul):not(ol)::after,
+  &
+    > :is(ul, ol):last-child
+    > li:last-child:not(:has(> :is(p, ul, ol, pre, blockquote, div)))::after,
+  & > :is(ul, ol):last-child > li:last-child > :is(p, div):last-child::after {
+    /*  \2060\258F  ▏ thin bar (1/8 block)
+         \2060\258E  ▎ slim bar (1/4 block)
+         \2060\258C  ▌ medium bar (1/2 block)
+         \2060\2588  █ full block (chunky)
+         \2060\2502  │ hairline vertical rule
+         \2060\007C  | ASCII pipe
+         \2060\2581  ▁ underscore bar (sits on baseline)
+         \2060\005F  _ underscore */
+    content: '\2060\258F';
+    margin-left: 0.02em;
+    /* color: currentColor; */
+    color: rgb(228, 228, 228);
+    animation: stream-caret-blink 1.05s steps(1, end) infinite;
+  }
+}
+
+@keyframes stream-caret-blink {
+  0%,
+  49.999% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-fade,
+  .stream-word-in {
+    animation: none;
+    opacity: 1;
+  }
+  .stream-caret ::after,
+  .stream-caret > ::after {
+    animation: none;
+    opacity: 1;
   }
 }

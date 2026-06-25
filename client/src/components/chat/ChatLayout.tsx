@@ -1,10 +1,10 @@
 import type {ChatMessage} from './types';
 import {ChatHeader} from './ChatHeader';
 import {MessageItem} from './MessageItem';
-import {StreamingDisplay} from './StreamingDisplay';
 import {ScrollButton} from './ScrollButton';
 import {InputSection} from './InputSection';
 import {QuickQuestionsSection} from './QuickQuestionsSection';
+import {StreamingDisplay, type StreamPresentation} from './stream';
 
 interface ChatLayoutProps {
   messages: ChatMessage[];
@@ -16,7 +16,8 @@ interface ChatLayoutProps {
   queueLength: number | null;
   scrollToBottom: (behavior?: ScrollBehavior) => void;
   isSomeoneProcessing: boolean;
-  displayedText: string;
+  receivedText: string;
+  streamPresentation: StreamPresentation;
   isReasoning: boolean;
   liveAnnouncement: string;
   statusAnnouncement: string;
@@ -35,7 +36,8 @@ export const ChatLayout = ({
   messages,
   message,
   loading,
-  displayedText,
+  receivedText,
+  streamPresentation,
   isReasoning,
   liveAnnouncement,
   statusAnnouncement,
@@ -77,7 +79,7 @@ export const ChatLayout = ({
           aria-label='Conversation'
           aria-busy={isGenerating}
           aria-relevant='additions'
-          className='chat-messages flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-3 pb-2 pt-4 outline-slate-900 space-y-2.5'
+          className='chat-messages flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3 pb-2 pt-4 outline-slate-900 space-y-2.5 max-md:touch-pan-y scrollbar-gutter-both'
         >
           {messages
             .filter((m) => m.role !== 'system')
@@ -92,7 +94,8 @@ export const ChatLayout = ({
             ))}
           <StreamingDisplay
             isGenerating={isGenerating}
-            displayedText={displayedText}
+            receivedText={receivedText}
+            presentation={streamPresentation}
             isReasoning={isReasoning}
             hasStarted={hasStarted}
             queuePosition={queuePosition}

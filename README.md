@@ -37,3 +37,5 @@ bun run dev
 **Test on a phone (same network):** open the client on your phone using your machine's LAN IP, not `localhost` (e.g. `http://192.168.1.x:5173` - `ipconfig getifaddr en0` on macOS). The widget targets the backend on that same host automatically, so no config is needed.
 
 **Model:** `SELECTED_MODEL` in `client/src/components/chat/ChatMain.tsx`.
+
+**Stream animation modes:** configurable visual styles for streaming replies — `fade` (per-phrase fade: whole sentences settle in), `word-queue` (fixed-cadence per-word fade), and `instant` (no animation / reduced-motion fallback). Switch via `STREAM_VISUAL_MODE` in `client/src/components/chat/stream/streamConfig.ts`.

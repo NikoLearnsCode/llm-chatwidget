@@ -7,6 +7,7 @@ import {ChatButton} from './ChatButton';
 import {ChatWidget} from './ChatWidget';
 import {ChatLayout} from './ChatLayout';
 import {getQueueStatusLabel} from './getQueueStatusLabel';
+import {useStreamPresentation} from './stream';
 import {getWebSocketUrl} from '@/lib/wsUrl';
 import {isDesktopViewport} from '@/lib/viewport';
 
@@ -42,13 +43,14 @@ export default function ChatMain() {
   const [isSomeoneProcessing, setIsSomeoneProcessing] = useState(false);
 
   const [userScrolledUp, setUserScrolledUp] = useState(false);
-  const [displayedText, setDisplayedText] = useState('');
+  const [receivedText, setReceivedText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [greeting, setGreeting] = useState('');
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
   const [statusAnnouncement, setStatusAnnouncement] = useState('');
   const [hasStarted, setHasStarted] = useState(false);
   const [isReasoning, setIsReasoning] = useState(false);
+  const [isStreamComplete, setIsStreamComplete] = useState(false);
 
   const hasScrolledOnOpen = useRef(false);
   const userTriedToSend = useRef(false);
@@ -64,6 +66,47 @@ export default function ChatMain() {
   // Id of the request we're waiting on. Frames whose id doesn't match are stale
   // replies (e.g. from an abandoned request) and get dropped.
   const currentRequestIdRef = useRef<string | null>(null);
+
+  const resetStreamBuffer = useCallback(() => {
+    setReceivedText('');
+    setIsStreamComplete(false);
+  }, []);
+
+  const streamPresentation = useStreamPresentation({
+    receivedText,
+    isStreamComplete,
+    isGenerating,
+  });
+
+  const finalizeStream = useCallback(
+    (text: string) => {
+      if (text.trim()) {
+        setLiveAnnouncement(text);
+        setMessages((existing) => {
+          const last = existing[existing.length - 1];
+          if (last && last.content === text) return existing;
+          return [
+            ...existing,
+            {role: 'assistant', content: text, model: SELECTED_MODEL},
+          ];
+        });
+      }
+      resetStreamBuffer();
+      setIsGenerating(false);
+      setLoading(false);
+    },
+    [resetStreamBuffer],
+  );
+
+  useEffect(() => {
+    if (!isStreamComplete || !streamPresentation.isPresentationComplete) return;
+    finalizeStream(receivedText);
+  }, [
+    isStreamComplete,
+    streamPresentation.isPresentationComplete,
+    receivedText,
+    finalizeStream,
+  ]);
 
   const clearTimers = useCallback(() => {
     if (connectTimerRef.current !== null) {
@@ -90,11 +133,11 @@ export default function ChatMain() {
       ]);
       setIsGenerating(false);
       setLoading(false);
-      setDisplayedText('');
+      resetStreamBuffer();
       setIsReasoning(false);
       setStatusAnnouncement('');
     },
-    [clearTimers],
+    [clearTimers, resetStreamBuffer],
   );
 
   // Give up on the in-flight request, dropping any queued send so a late reconnect
@@ -165,11 +208,11 @@ export default function ChatMain() {
       );
       return;
     }
-    if (isReasoning && !displayedText) {
+    if (isReasoning && !receivedText) {
       setStatusAnnouncement('Reasoning');
       return;
     }
-    if (displayedText) {
+    if (receivedText) {
       setStatusAnnouncement('Assistant is replying');
       return;
     }
@@ -182,7 +225,7 @@ export default function ChatMain() {
     queueLength,
     isSomeoneProcessing,
     isReasoning,
-    displayedText,
+    receivedText,
   ]);
 
   useEffect(() => {
@@ -224,27 +267,13 @@ export default function ChatMain() {
         return;
       }
 
-      // Stream finished - save the reply and reset loading state.
+      // Stream finished — wait for presentation (e.g. word-queue catch-up) before
+      // moving the reply into the thread.
       if ('type' in msg && msg.type === 'done') {
         clearTimers();
         currentRequestIdRef.current = null;
         userTriedToSend.current = false;
-        setDisplayedText((prev) => {
-          if (prev.trim()) {
-            setLiveAnnouncement(prev);
-            setMessages((existing) => {
-              const last = existing[existing.length - 1];
-              if (last && last.content === prev) return existing;
-              return [
-                ...existing,
-                {role: 'assistant', content: prev, model: SELECTED_MODEL},
-              ];
-            });
-          }
-          return '';
-        });
-        setIsGenerating(false);
-        setLoading(false);
+        setIsStreamComplete(true);
         return;
       }
 
@@ -270,7 +299,7 @@ export default function ChatMain() {
         setHasStarted(true);
         setIsReasoning(false);
         setQueuePosition(null);
-        setDisplayedText((prev) => prev + msg.delta);
+        setReceivedText((prev) => prev + msg.delta);
         return;
       }
     };
@@ -311,7 +340,7 @@ export default function ChatMain() {
             }
           }
           userTriedToSend.current = false;
-          setDisplayedText('');
+          resetStreamBuffer();
           setIsReasoning(false);
           setIsGenerating(false);
           setLoading(false);
@@ -344,6 +373,7 @@ export default function ChatMain() {
     armConnectTimer,
     armResponseTimer,
     clearTimers,
+    resetStreamBuffer,
   ]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -359,7 +389,7 @@ export default function ChatMain() {
       setUserScrolledUp(false);
       setHasStarted(false);
       setIsReasoning(false);
-      setDisplayedText('');
+      resetStreamBuffer();
       setLiveAnnouncement('');
       setQueuePosition(null);
 
@@ -389,7 +419,7 @@ export default function ChatMain() {
         pendingPayloadRef.current = payloadStr;
       }
     },
-    [armConnectTimer],
+    [armConnectTimer, resetStreamBuffer],
   );
 
   const sendPrompt = (quick?: string) => {
@@ -421,10 +451,20 @@ export default function ChatMain() {
 
   // Scroll to bottom when generating if user hasn't scrolled up
   useEffect(() => {
-    if (isGenerating && displayedText && !userScrolledUp) {
+    if (
+      isGenerating &&
+      streamPresentation.hasVisibleContent &&
+      !userScrolledUp
+    ) {
       scrollToBottom('auto');
     }
-  }, [isGenerating, displayedText, userScrolledUp, scrollToBottom]);
+  }, [
+    isGenerating,
+    streamPresentation.hasVisibleContent,
+    streamPresentation.visibleText,
+    userScrolledUp,
+    scrollToBottom,
+  ]);
 
   // Scroll to bottom when a new message is added, sentPrompt will set userScrolledUp to false
   useEffect(() => {
@@ -476,7 +516,8 @@ export default function ChatMain() {
           scrollToBottom={scrollToBottom}
           userScrolledUp={userScrolledUp}
           hasStarted={hasStarted}
-          displayedText={displayedText}
+          receivedText={receivedText}
+          streamPresentation={streamPresentation}
           isReasoning={isReasoning}
           liveAnnouncement={liveAnnouncement}
           statusAnnouncement={statusAnnouncement}

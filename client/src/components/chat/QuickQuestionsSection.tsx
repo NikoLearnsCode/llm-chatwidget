@@ -47,7 +47,7 @@ export const QuickQuestionsSection = ({
       id='chat-widget-main'
       aria-labelledby='chat-quick-questions-heading'
       aria-busy={loading}
-      className='chat-messages flex-1 min-w-0 overflow-y-auto overflow-x-hidden px-3.5 pt-4 pb-6 space-y-3'
+      className='chat-messages flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 pt-4 pb-6 space-y-3 max-md:touch-pan-y scrollbar-gutter-both'
     >
       <h2 id='chat-quick-questions-heading' className='sr-only'>
         Suggested questions
