@@ -1,6 +1,8 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import type {ChatErrorKind} from '@/lib/errors';
-import {useStreamPresentation} from '../stream';
+import type {StreamPresentation} from '../types';
+import {STREAM_FADE_DURATION_MS} from '../ui/ChatMarkdown';
+import {usePrefersReducedMotion} from '../hooks/usePrefersReducedMotion';
 import {useChatScroll} from '../hooks/useChatScroll';
 import {useChatUI} from '../hooks/useChatUI';
 import {useChatWebSocket} from '../hooks/useChatWebSocket';
@@ -38,11 +40,26 @@ export function ChatProvider({children}: {children: React.ReactNode}) {
     receivedText: connection.receivedText,
   });
 
-  const streamPresentation = useStreamPresentation({
-    receivedText: connection.receivedText,
-    isStreamComplete: connection.isStreamComplete,
-    isGenerating: messages.isGenerating,
-  });
+  // Streamdown owns the whole reveal (heal + markdown + per-word fade); we just
+  // forward the raw stream. The one bit of state left is finalize gating: hold the
+  // hand-off until the last word's fade settles so the streaming bubble doesn't pop
+  // to its static thread copy mid-animation. Reduced motion skips the fade entirely.
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const animate = !prefersReducedMotion;
+  const [fadeSettled, setFadeSettled] = useState(false);
+  useEffect(() => {
+    if (!animate) return setFadeSettled(true);
+    if (!connection.isStreamComplete) return setFadeSettled(false);
+    const timer = setTimeout(() => setFadeSettled(true), STREAM_FADE_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [animate, connection.isStreamComplete]);
+
+  const streamPresentation: StreamPresentation = {
+    visibleText: connection.receivedText,
+    hasVisibleContent: connection.receivedText.length > 0,
+    isAnimating: animate && messages.isGenerating && !fadeSettled,
+    isPresentationComplete: connection.isStreamComplete && fadeSettled,
+  };
 
   const scroll = useChatScroll({
     isChatOpen: ui.isChatOpen,
@@ -76,6 +93,7 @@ export function ChatProvider({children}: {children: React.ReactNode}) {
     isGenerating: messages.isGenerating,
     handleInputChange: messages.handleInputChange,
     sendPrompt: messages.sendPrompt,
+    stopGeneration: messages.stopGeneration,
     retryLastMessage: messages.retryLastMessage,
     clearMessages: messages.clearMessages,
     receivedText: connection.receivedText,

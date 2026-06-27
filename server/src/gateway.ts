@@ -4,7 +4,7 @@ import {systemPromptTest} from '../systemPrompts/assistant.prompt';
 import {createLocalRunner} from './local';
 import {createCloudRunner} from './cloud';
 
-// Routes local (queued Ollama) vs cloud (direct APIs). Worlds don't know about each other.
+// Local goes through the queue, cloud runs straight through.
 export function createGateway() {
   const local = createLocalRunner();
   const cloud = createCloudRunner();
@@ -15,7 +15,7 @@ export function createGateway() {
       ...request.messages,
     ];
 
-    // No provider field means ollama, for older clients.
+    // Missing provider means ollama for old clients.
     const provider = request.provider ?? 'ollama';
     if (cloud.serves(provider)) {
       cloud.handle(ws, request, messages);
@@ -24,12 +24,18 @@ export function createGateway() {
     }
   };
 
+  // Stop by id. Each runner only handles its own requests.
+  const handleStop = (ws: ChatSocket, id: string) => {
+    local.cancel(ws, id);
+    cloud.cancel(ws, id);
+  };
+
   const handleClose = (ws: ChatSocket) => {
     local.closeSocket(ws);
     cloud.closeSocket(ws);
   };
 
-  return {handleRequest, handleClose};
+  return {handleRequest, handleStop, handleClose};
 }
 
 export type Gateway = ReturnType<typeof createGateway>;

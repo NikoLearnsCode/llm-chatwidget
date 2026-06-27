@@ -4,25 +4,22 @@ import type {
   Provider,
 } from '@chatwidget/shared';
 import {createRateLimiter, type RateLimiter} from '../core/rateLimit';
-import {streamToSocket} from '../core/pump';
+import {streamToSocket, USER_CANCEL_REASON} from '../core/pump';
 import {streamGeminiChat} from './gemini';
 import type {ProviderStreamFn} from '../core/provider';
 import {sendError, type ChatSocket} from '../core/socket';
 
-// Cloud APIs (Gemini, etc). No queue; many can run at once. Each provider sets
-// rate limits, allowed models, and its own timeout. Add new ones in CLOUD_PROVIDERS.
+// Cloud APIs run in parallel. Add new providers in CLOUD_PROVIDERS.
 
 interface CloudProvider {
   stream: ProviderStreamFn;
-  // Per-IP throttle. Required for every cloud provider.
   rateLimit: {max: number; windowMs: number};
-  // Per-request cap. Stay under client RESPONSE_TIMEOUT_MS (50s). See connection-lifecycle.md.
+  // Keep below client timeout. See connection-lifecycle.md.
   timeoutMs: number;
-  // Block arbitrary model names from the public client.
   allowedModels: Set<string>;
 }
 
-// Every provider except ollama. Adding one to the union forces config here.
+// Every provider except ollama needs an entry below.
 type CloudProviderName = Exclude<Provider, 'ollama'>;
 
 const CLOUD_PROVIDERS: Record<CloudProviderName, CloudProvider> = {
@@ -35,7 +32,6 @@ const CLOUD_PROVIDERS: Record<CloudProviderName, CloudProvider> = {
 };
 
 export function createCloudRunner() {
-  // One limiter per provider.
   const limiters = new Map<CloudProviderName, RateLimiter>();
   for (const [name, cfg] of Object.entries(CLOUD_PROVIDERS) as [
     CloudProviderName,
@@ -47,23 +43,27 @@ export function createCloudRunner() {
     );
   }
 
-  // Track active gens per socket so disconnect can abort them.
-  const active = new Map<ChatSocket, Set<AbortController>>();
+  // Active requests per socket, keyed by id so stop hits the right one.
+  const active = new Map<ChatSocket, Map<string, AbortController>>();
 
-  const addActive = (ws: ChatSocket, controller: AbortController) => {
-    let set = active.get(ws);
-    if (!set) {
-      set = new Set();
-      active.set(ws, set);
+  const addActive = (
+    ws: ChatSocket,
+    id: string,
+    controller: AbortController,
+  ) => {
+    let byId = active.get(ws);
+    if (!byId) {
+      byId = new Map();
+      active.set(ws, byId);
     }
-    set.add(controller);
+    byId.set(id, controller);
   };
 
-  const removeActive = (ws: ChatSocket, controller: AbortController) => {
-    const set = active.get(ws);
-    if (!set) return;
-    set.delete(controller);
-    if (set.size === 0) active.delete(ws);
+  const removeActive = (ws: ChatSocket, id: string) => {
+    const byId = active.get(ws);
+    if (!byId) return;
+    byId.delete(id);
+    if (byId.size === 0) active.delete(ws);
   };
 
   const run = async (
@@ -73,7 +73,7 @@ export function createCloudRunner() {
     provider: CloudProvider,
   ) => {
     const controller = new AbortController();
-    addActive(ws, controller);
+    addActive(ws, request.id, controller);
     const timeout = setTimeout(() => controller.abort(), provider.timeoutMs);
 
     try {
@@ -86,11 +86,10 @@ export function createCloudRunner() {
     } finally {
       clearTimeout(timeout);
       controller.abort();
-      removeActive(ws, controller);
+      removeActive(ws, request.id);
     }
   };
 
-  // True if this is a cloud provider we handle.
   const serves = (provider: string): provider is CloudProviderName =>
     Object.prototype.hasOwnProperty.call(CLOUD_PROVIDERS, provider);
 
@@ -99,7 +98,6 @@ export function createCloudRunner() {
     request: ClientRequest,
     messages: OutgoingMessage[],
   ) => {
-    // serves() narrows the type so lookups below need no casts.
     const name = request.provider;
     if (!name || !serves(name)) {
       sendError(
@@ -130,14 +128,19 @@ export function createCloudRunner() {
     void run(ws, request, messages, config);
   };
 
+  // Stop one request by id.
+  const cancel = (ws: ChatSocket, id: string) => {
+    active.get(ws)?.get(id)?.abort(USER_CANCEL_REASON);
+  };
+
   const closeSocket = (ws: ChatSocket) => {
-    const set = active.get(ws);
-    if (!set) return;
-    for (const controller of set) controller.abort();
+    const byId = active.get(ws);
+    if (!byId) return;
+    for (const controller of byId.values()) controller.abort();
     active.delete(ws);
   };
 
-  return {serves, handle, closeSocket};
+  return {serves, handle, cancel, closeSocket};
 }
 
 export type CloudRunner = ReturnType<typeof createCloudRunner>;

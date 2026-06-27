@@ -38,6 +38,8 @@ export interface ChatWebSocket {
   prepareForNewRequest: () => void;
   // Send (or park, mid-reconnect) a serialized ClientRequest and arm phase 1.
   sendPayload: (payloadStr: string, requestId: string) => void;
+  // Abort the in-flight request server-side and tear down local ingest state.
+  cancelRequest: () => void;
 }
 
 // Network layer. Owns the lifetime WebSocket (with backoff reconnect), the two
@@ -150,6 +152,24 @@ export function useChatWebSocket({
     },
     [armConnectTimer],
   );
+
+  // Stop the in-flight request: tell the server to abort, then drop all in-flight
+  // state so any late frames for this id are treated as stale and ignored.
+  const cancelRequest = useCallback(() => {
+    const id = currentRequestIdRef.current;
+    const ws = wsRef.current;
+    // Only worth a stop frame if we actually sent the request.
+    if (id && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({type: 'stop', id}));
+    }
+    // A parked send that never went out is simply dropped here.
+    pendingPayloadRef.current = null;
+    currentRequestIdRef.current = null;
+    userTriedToSend.current = false;
+    clearTimers();
+    prepareForNewRequest();
+    onIdle();
+  }, [clearTimers, prepareForNewRequest, onIdle]);
 
   // Keep a WebSocket open for the page lifetime, reconnecting with backoff so the
   // widget recovers without a reload.
@@ -303,5 +323,6 @@ export function useChatWebSocket({
     resetStreamBuffer,
     prepareForNewRequest,
     sendPayload,
+    cancelRequest,
   };
 }

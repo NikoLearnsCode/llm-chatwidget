@@ -1,15 +1,19 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {v4 as uuidv4} from 'uuid';
-import type {ClientRequest} from '@chatwidget/shared';
+import type {ClientRequest, Provider} from '@chatwidget/shared';
 import {CHAT_ERRORS, type ChatErrorKind} from '@/lib/errors';
 import type {ChatMessage} from '../types';
 import type {ChatWebSocket} from './useChatWebSocket';
 
 const SELECTED_MODEL = 'llama3.1:8b';
-const SELECTED_PROVIDER = 'ollama' as const;
+// const SELECTED_MODEL = 'gemma4:e4b';
+// const SELECTED_MODEL = 'gpt-oss';
+const SELECTED_PROVIDER: Provider = 'ollama';
+
 /* const SELECTED_MODEL = 'gemini-2.5-flash';
-const SELECTED_PROVIDER = 'gemini' as const; */
-const MAX_HISTORY = 10;
+const SELECTED_PROVIDER: Provider = 'gemini'; */
+
+const LOCAL_MAX_HISTORY = 10;
 
 interface UseChatMessagesOptions {
   connection: ChatWebSocket;
@@ -25,6 +29,7 @@ export interface ChatMessages {
   liveAnnouncement: string;
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   sendPrompt: (quick?: string) => void;
+  stopGeneration: () => void;
   retryLastMessage: () => void;
   clearMessages: () => void;
   // Wired into the connection. Append an error bubble and clear lifecycle flags.
@@ -47,7 +52,13 @@ export function useChatMessages({
   const [isGenerating, setIsGenerating] = useState(false);
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
-  const {prepareForNewRequest, sendPayload, resetStreamBuffer} = connection;
+  const {prepareForNewRequest, sendPayload, resetStreamBuffer, cancelRequest} =
+    connection;
+
+  // Latest streamed text, mirrored into a ref so stopGeneration can grab the
+  // partial reply without recreating its callback on every token.
+  const receivedTextRef = useRef('');
+  receivedTextRef.current = connection.receivedText;
 
   const onIdle = useCallback(() => {
     setIsGenerating(false);
@@ -104,10 +115,12 @@ export function useChatMessages({
       prepareForNewRequest();
 
       // Error bubbles are display-only. Never send them to the model as history.
-      const messagesForApi = conversation
-        .filter((m) => !m.isError)
-        .slice(-MAX_HISTORY)
-        .map(({role, content}) => ({role, content}));
+      const filtered = conversation.filter((m) => !m.isError);
+      const messagesForApi = (
+        SELECTED_PROVIDER === 'ollama'
+          ? filtered.slice(-LOCAL_MAX_HISTORY)
+          : filtered
+      ).map(({role, content}) => ({role, content}));
 
       const payload: ClientRequest = {
         id: uuidv4(),
@@ -120,6 +133,15 @@ export function useChatMessages({
     },
     [prepareForNewRequest, sendPayload, onSubmit],
   );
+
+  // Abort the in-flight request, but only once visible text is streaming (not
+  // during the queue wait or the reasoning phase). Keep whatever streamed so far
+  // by finalizing it into the thread before tearing down the connection state.
+  const stopGeneration = useCallback(() => {
+    if (!connection.hasStarted || connection.isReasoning) return;
+    finalize(receivedTextRef.current);
+    cancelRequest();
+  }, [connection.hasStarted, connection.isReasoning, finalize, cancelRequest]);
 
   const sendPrompt = useCallback(
     (quick?: string) => {
@@ -159,6 +181,7 @@ export function useChatMessages({
     liveAnnouncement,
     handleInputChange,
     sendPrompt,
+    stopGeneration,
     retryLastMessage,
     clearMessages,
     appendError,

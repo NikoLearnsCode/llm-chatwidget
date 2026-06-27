@@ -1,4 +1,4 @@
-// Shared WebSocket message types between client and server.
+// WebSocket types shared by client and server.
 export type Role = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
@@ -14,16 +14,25 @@ export interface OutgoingMessage {
   content: string;
 }
 
-// Which backend serves the request. ollama uses the queue; cloud providers don't.
+// Backend choice. Ollama uses the queue.
 export type Provider = 'ollama' | 'gemini';
 
 export interface ClientRequest {
   id: string;
-  // Missing means ollama, for older clients.
+  // Defaults to ollama for old clients.
   provider?: Provider;
   model: string;
   messages: OutgoingMessage[];
 }
+
+// Ask the server to stop this request.
+export interface ClientStopRequest {
+  type: 'stop';
+  id: string;
+}
+
+// Chat requests have no type field. Stops use type stop.
+export type ClientMessage = ClientRequest | ClientStopRequest;
 
 export interface QueueServerMessage {
   type: 'queue';
@@ -38,20 +47,19 @@ export interface DoneServerMessage {
   id: string;
 }
 
-// Why the server sent an error. Client maps this to user-facing copy.
+// Error kind. Client turns this into UI text.
 export type ServerErrorCode =
-  | 'rate_limit' // too many requests
-  | 'unavailable' // provider or model down or misconfigured
-  | 'timeout' // hit the per-request cap
-  | 'transient'; // retry might work
+  | 'rate_limit'
+  | 'unavailable'
+  | 'timeout'
+  | 'transient';
 
 export interface ErrorServerMessage {
   type: 'error';
-  // Missing on bad JSON etc before we have a request id
+  // Omitted when we do not have a request id yet.
   id?: string;
-  // Client maps code to copy. Missing means transient.
   code?: ServerErrorCode;
-  // For logs and old clients. UI uses code, not message.
+  // For logs. UI uses code not message.
   message: string;
 }
 

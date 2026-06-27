@@ -1,5 +1,5 @@
 import {Hono} from 'hono';
-import type {ClientRequest, Provider} from '@chatwidget/shared';
+import type {ClientRequest, ClientStopRequest, Provider} from '@chatwidget/shared';
 import {isAllowedOrigin} from './origins';
 import {type ChatSocket, type SocketData} from './core/socket';
 import {createGateway} from './gateway';
@@ -13,7 +13,7 @@ const app = new Hono();
 
 app.get('/health', (c) => c.json({ok: true}));
 
-// Bun serves both HTTP and WebSocket on the same port.
+// HTTP and WebSocket on one port.
 const server = Bun.serve<SocketData>({
   port: PORT,
   hostname: '0.0.0.0',
@@ -27,8 +27,7 @@ const server = Bun.serve<SocketData>({
         return new Response('Forbidden origin', {status: 403});
       }
 
-      // Real IP for rate limiter. Behind Cloudflare, use forwarded headers.
-      // Only safe because origin check gates who can connect.
+      // IP for rate limiting. Forwarded headers are ok because we check origin first.
       const clientIp =
         req.headers.get('cf-connecting-ip') ??
         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
@@ -58,6 +57,12 @@ const server = Bun.serve<SocketData>({
         return;
       }
 
+      // Stop frame comes before a full chat request.
+      if (isClientStop(parsed)) {
+        gateway.handleStop(ws, parsed.id);
+        return;
+      }
+
       if (!isClientRequest(parsed)) {
         ws.send(
           JSON.stringify({
@@ -82,7 +87,7 @@ const server = Bun.serve<SocketData>({
   },
 });
 
-// Drop connections that stop responding to ping.
+// Close sockets that stop answering ping.
 const heartbeat = setInterval(() => {
   for (const ws of liveSockets) {
     if (ws.data.isAlive === false) {
@@ -105,6 +110,12 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 const PROVIDERS: readonly Provider[] = ['ollama', 'gemini'];
+
+function isClientStop(value: unknown): value is ClientStopRequest {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.type === 'stop' && typeof v.id === 'string';
+}
 
 function isClientRequest(value: unknown): value is ClientRequest {
   if (typeof value !== 'object' || value === null) return false;

@@ -1,20 +1,18 @@
 import type {ClientRequest} from '@chatwidget/shared';
 import {type ChatSocket, SOCKET_OPEN} from '../core/socket';
 import type {ProviderStreamFn} from '../core/provider';
-import {streamToSocket} from '../core/pump';
+import {streamToSocket, USER_CANCEL_REASON} from '../core/pump';
 
-// Cap per generation so a hang can't block the queue. Client timeout sits just above.
+// Max time per job so a hang does not block the queue.
 const GENERATION_TIMEOUT_MS = 40_000;
 
 interface QueueEntry {
   ws: ChatSocket;
   request: ClientRequest;
-  // Stream fn injected by caller; queue doesn't import providers.
   streamFn: ProviderStreamFn;
 }
 
-// One generation at a time to protect VRAM. Cloud providers skip this path.
-// Owns FIFO order, position updates, and per-gen timeout.
+// One job at a time. Handles order, queue position, and timeout.
 export function createQueueManager() {
   let queue: QueueEntry[] = [];
   let isProcessing = false;
@@ -40,7 +38,6 @@ export function createQueueManager() {
     });
   };
 
-  // Dequeue and pump to socket.
   const processNext = async () => {
     if (isProcessing) return;
     const entry = queue.shift();
@@ -71,7 +68,6 @@ export function createQueueManager() {
       console.log(`Completed processing request ID: ${request.id}`);
     } finally {
       clearTimeout(timeout);
-      // Always abort the underlying gen when we're done here.
       controller.abort();
       isProcessing = false;
       processingId = null;
@@ -92,8 +88,20 @@ export function createQueueManager() {
     void processNext();
   };
 
+  // Stop by id. Aborts the active job or drops it from the queue.
+  const cancel = (ws: ChatSocket, id: string) => {
+    if (processingId === id && activeSocket === ws) {
+      activeController?.abort(USER_CANCEL_REASON);
+      return;
+    }
+    const before = queue.length;
+    queue = queue.filter((entry) => !(entry.ws === ws && entry.request.id === id));
+    if (queue.length !== before) {
+      broadcastPositions();
+    }
+  };
+
   const removeSocket = (ws: ChatSocket) => {
-    // Abort active gen if this socket disconnected.
     if (activeSocket === ws && activeController) {
       activeController.abort();
     }
@@ -104,7 +112,7 @@ export function createQueueManager() {
     }
   };
 
-  return {enqueue, removeSocket};
+  return {enqueue, cancel, removeSocket};
 }
 
 export type QueueManager = ReturnType<typeof createQueueManager>;

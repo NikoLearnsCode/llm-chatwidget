@@ -3,7 +3,7 @@ import {MessageItem} from './ui/MessageItem';
 import {ScrollButton} from './ui/ScrollButton';
 import {InputSection} from './ui/InputSection';
 import {QuickQuestionsSection} from './ui/QuickQuestionsSection';
-import {StreamingDisplay} from './stream';
+import {StreamingDisplay} from './ui/StreamingDisplay';
 import {useChat} from './context/ChatContext';
 
 export const ChatLayout = () => {
@@ -27,6 +27,7 @@ export const ChatLayout = () => {
     closeChat,
     handleInputChange,
     sendPrompt,
+    stopGeneration,
     retryLastMessage,
     chatEndRef,
     userScrolledUp,
@@ -108,8 +109,11 @@ export const ChatLayout = () => {
         message={input}
         loading={loading}
         isGenerating={isGenerating}
+        hasStarted={hasStarted}
+        isReasoning={isReasoning}
         handleInputChange={handleInputChange}
         sendPrompt={sendPrompt}
+        stopGeneration={stopGeneration}
       />
     </div>
   );

@@ -1,6 +1,5 @@
 import {createContext, useContext} from 'react';
-import type {ChatMessage} from '../types';
-import type {StreamPresentation} from '../stream';
+import type {ChatMessage, StreamPresentation} from '../types';
 
 export interface ChatContextValue {
   // UI / a11y
@@ -17,6 +16,7 @@ export interface ChatContextValue {
   isGenerating: boolean;
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   sendPrompt: (quick?: string) => void;
+  stopGeneration: () => void;
   retryLastMessage: () => void;
   clearMessages: () => void;
   // Connection ingest

@@ -1,8 +1,10 @@
 import {type ChatSocket, SOCKET_OPEN} from './socket';
 import type {ProviderStreamEvent} from './provider';
 
-// Turn provider events into socket messages. Shared by queue and cloud paths.
-// Caller owns AbortController and timeout; pump just reads signal.
+// User hit stop. Client already cleaned up so we send nothing.
+export const USER_CANCEL_REASON = 'user_cancel';
+
+// Maps provider events to socket frames. Shared by queue and cloud.
 export async function streamToSocket(
   ws: ChatSocket,
   id: string,
@@ -39,9 +41,8 @@ export async function streamToSocket(
       }
     }
   } catch (err) {
-    // Expected abort (timeout or disconnect). Only send timeout if socket is open.
     if (signal.aborted) {
-      if (ws.readyState === SOCKET_OPEN) {
+      if (signal.reason !== USER_CANCEL_REASON && ws.readyState === SOCKET_OPEN) {
         ws.send(
           JSON.stringify({
             type: 'error',

@@ -1,24 +1,34 @@
 import {useRef} from 'react';
 import {ArrowUp} from '@/icons/ArrowUp';
 import {LoaderCircle} from '@/icons/LoaderCircle';
+import {Square} from '@/icons/Square';
 
 interface InputSectionProps {
   message: string;
   loading: boolean;
   isGenerating: boolean;
+  hasStarted: boolean;
+  isReasoning: boolean;
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   sendPrompt: (quickPrompt?: string) => void;
+  stopGeneration: () => void;
 }
 
 export const InputSection = ({
   message,
   loading,
   isGenerating,
+  hasStarted,
+  isReasoning,
   handleInputChange,
   sendPrompt,
+  stopGeneration,
 }: InputSectionProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isDisabled = loading || isGenerating || message.trim() === '';
+  const isInFlight = loading || isGenerating;
+  const canStop = isInFlight && hasStarted && !isReasoning;
+  const isWaiting = isInFlight && !canStop;
+  const isDisabled = isWaiting || (!isInFlight && message.trim() === '');
 
   return (
     <div className='shrink-0 bg-white px-3 pb-3.5 pt-0'>
@@ -44,14 +54,20 @@ export const InputSection = ({
         />
         <button
           type='button'
-          onClick={() => sendPrompt()}
+          onClick={() => (canStop ? stopGeneration() : sendPrompt())}
           disabled={isDisabled}
-          aria-label='Send message'
-          aria-busy={loading || isGenerating}
-          className='absolute right-1.5 bottom-1.5 h-8 w-8 grid place-content-center rounded-lg bg-slate-900 text-white transition-all hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400'
+          aria-label={canStop ? 'Stop generating' : 'Send message'}
+          aria-busy={isWaiting}
+          className={`absolute right-1.5 bottom-1.5 h-8 w-8 grid place-content-center rounded-lg transition-all ${
+            canStop
+              ? 'border border-slate-200 bg-slate-200 text-slate-600 hover:border-slate-400'
+              : 'bg-slate-900 text-white hover:bg-slate-700 disabled:bg-slate-200 disabled:text-slate-400'
+          }`}
         >
-          {loading || isGenerating ? (
+          {isWaiting ? (
             <LoaderCircle className='h-4 w-4 animate-spin' aria-hidden />
+          ) : canStop ? (
+            <Square className='h-4.5 w-4.5' aria-hidden />
           ) : (
             <ArrowUp className='h-4 w-4' strokeWidth={2.5} />
           )}

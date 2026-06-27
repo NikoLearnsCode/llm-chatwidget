@@ -4,9 +4,8 @@ import {createRateLimiter} from '../core/rateLimit';
 import {streamOllamaChat} from './ollama';
 import {sendError, type ChatSocket} from '../core/socket';
 
-// Local Ollama behind a one-at-a-time queue. For exposing a local GPU over a tunnel.
+// Local Ollama, one request at a time.
 
-// Stops one IP from flooding the queue.
 const RATE_LIMIT = {max: 10, windowMs: 60_000} as const;
 
 export function createLocalRunner() {
@@ -22,13 +21,14 @@ export function createLocalRunner() {
       sendError(ws, request.id, 'rate_limit', 'Rate limit exceeded.');
       return;
     }
-    // Queue is provider-agnostic; pass the Ollama stream fn.
     queue.enqueue(ws, {...request, messages}, streamOllamaChat);
   };
 
+  const cancel = (ws: ChatSocket, id: string) => queue.cancel(ws, id);
+
   const closeSocket = (ws: ChatSocket) => queue.removeSocket(ws);
 
-  return {handle, closeSocket};
+  return {handle, cancel, closeSocket};
 }
 
 export type LocalRunner = ReturnType<typeof createLocalRunner>;

@@ -32,6 +32,7 @@ export function useChatScroll({
   const hasScrolledOnOpen = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastScrollTopRef = useRef(0);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     chatEndRef.current?.scrollIntoView({behavior});
@@ -65,14 +66,21 @@ export function useChatScroll({
     }
   }, [isChatOpen, scrollToBottom, messages.length]);
 
-  // Track whether the user has scrolled away from the bottom
+  // Track whether the user has scrolled away from the bottom.
   const handleScroll = useCallback(() => {
     const container = chatContainerRef.current;
     if (!container) return;
     const threshold = 5; // 5px threshold to consider the user has scrolled up
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    setUserScrolledUp(distanceFromBottom > threshold);
+    const scrolledUpward = container.scrollTop < lastScrollTopRef.current - 1;
+    lastScrollTopRef.current = container.scrollTop;
+
+    if (distanceFromBottom <= threshold) {
+      setUserScrolledUp(false); // back at the bottom → resume auto-follow
+    } else if (scrolledUpward) {
+      setUserScrolledUp(true); // deliberate scroll away → stop following
+    }
   }, []);
 
   useEffect(() => {

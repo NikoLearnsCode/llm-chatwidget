@@ -1,6 +1,5 @@
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import {CHAT_ERRORS} from '@/lib/errors';
+import {ChatMarkdown} from './ChatMarkdown';
 import type {ChatMessage} from '../types';
 
 interface MessageItemProps {
@@ -58,25 +57,9 @@ export const MessageItem = ({message, onRetry}: MessageItemProps) => {
       <div
         role='article'
         aria-label='Assistant message'
-        className='chat-prose max-w-full min-w-0 font-medium rounded-2xl rounded-bl-md px-1.5 py-2.5 text-[14px] text-slate-900 prose prose-slate prose-sm prose-p:my-1 prose-headings:my-2 prose-pre:bg-slate-900 prose-pre:text-slate-100'
+        className='chat-prose max-w-full min-w-0 font-medium rounded-2xl rounded-bl-md px-1.5 py-2.5 text-[14px] text-slate-900 prose prose-slate prose-sm prose-p:my-1 prose-headings:my-2 prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-hr:my-5'
       >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            a: ({href, children}) => (
-              <a
-                href={href}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='text-slate-900 underline underline-offset-2 hover:text-slate-700'
-              >
-                {children}
-              </a>
-            ),
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
+        <ChatMarkdown text={message.content} />
       </div>
     </div>
   );

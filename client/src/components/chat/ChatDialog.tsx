@@ -119,7 +119,7 @@ export const ChatDialog = ({isOpen, onClose, children}: ChatDialogProps) => {
       id='chat-widget-dialog'
       tabIndex={-1}
       aria-labelledby='chat-widget-title'
-      className='fixed m-0 p-0 border-0 w-full max-w-none h-dvh max-h-dvh overflow-hidden bg-white text-slate-900 opacity-100 transform-none transition-none open:opacity-100 open:transform-none open:transition-none backdrop:bg-transparent max-md:inset-0 max-md:overscroll-none max-md:touch-none md:inset-auto md:top-auto md:right-6 md:bottom-8 md:left-auto md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 md:w-[380px] md:h-[min(600px,calc(100dvh-3rem))]'
+      className='fixed m-0 p-0 border-0 w-full max-w-none h-dvh max-h-dvh overflow-hidden bg-white text-slate-900 opacity-100 transform-none transition-none open:opacity-100 open:transform-none open:transition-none backdrop:bg-transparent max-md:inset-0 max-md:overscroll-none max-md:touch-none md:inset-auto md:top-auto md:right-6 md:bottom-8 md:left-auto md:rounded-2xl md:shadow-2xl md:border md:border-slate-200 md:w-[400px] md:h-[min(800px,calc(100dvh-3rem))]'
     >
       <div
         ref={contentRef}

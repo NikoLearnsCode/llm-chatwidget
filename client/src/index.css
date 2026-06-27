@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
+@import 'streamdown/styles.css';
 
 html {
   overscroll-behavior-y: none;
@@ -53,9 +54,9 @@ button {
   content: '.';
   display: inline-block;
   width: 1.75em;
-  font-size: 1.35em;
+  font-size: 1.25em;
   line-height: 1;
-  vertical-align: -0.05em;
+  margin-left: 1px;
   text-align: left;
   animation: chat-status-dots 1.35s steps(1, end) infinite;
 }
@@ -75,83 +76,40 @@ button {
   }
 }
 
-.stream-word,
-.stream-phrase {
-  display: inline;
+.chat-status-pulse {
+  animation: chat-status-pulse 1.8s ease-in-out infinite;
 }
 
-.stream-fade {
-  animation-name: stream-fade;
-  /* animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); */
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
-
-@keyframes stream-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.stream-word-in {
-  animation-name: stream-word-in;
-  animation-timing-function: ease-out;
-  animation-fill-mode: both;
-}
-
-@keyframes stream-word-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.stream-caret {
-  & > :last-child:not(ul):not(ol)::after,
-  &
-    > :is(ul, ol):last-child
-    > li:last-child:not(:has(> :is(p, ul, ol, pre, blockquote, div)))::after,
-  & > :is(ul, ol):last-child > li:last-child > :is(p, div):last-child::after {
-    /*  \2060\258F  ▏ thin bar (1/8 block)
-         \2060\258E  ▎ slim bar (1/4 block)
-         \2060\258C  ▌ medium bar (1/2 block)
-         \2060\2588  █ full block (chunky)
-         \2060\2502  │ hairline vertical rule
-         \2060\007C  | ASCII pipe
-         \2060\2581  ▁ underscore bar (sits on baseline)
-         \2060\005F  _ underscore */
-    content: '\2060\258F';
-    margin-left: 0.02em;
-    /* color: currentColor; */
-    color: rgb(228, 228, 228);
-    animation: stream-caret-blink 1.05s steps(1, end) infinite;
-  }
-}
-
-@keyframes stream-caret-blink {
+@keyframes chat-status-pulse {
   0%,
-  49.999% {
+  100% {
+    opacity: 0.55;
+  }
+  50% {
     opacity: 1;
   }
-  50%,
-  100% {
+}
+
+.chat-status-label {
+  display: inline-block;
+  animation: chat-status-label-in 0.35s ease-out both;
+}
+
+@keyframes chat-status-label-in {
+  from {
     opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stream-fade,
-  .stream-word-in {
-    animation: none;
-    opacity: 1;
-  }
-  .stream-caret ::after,
-  .stream-caret > ::after {
+  .chat-status-dots::after,
+  .chat-status-pulse,
+  .chat-status-label {
     animation: none;
     opacity: 1;
   }
